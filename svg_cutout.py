@@ -3,6 +3,7 @@ from lxml import etree
 import argparse
 import sys
 
+Version = 0.2
 
 """
 This script converts SVG paths into G-code spirals for CNC machining.
@@ -18,14 +19,14 @@ Arguments:
     infile      Path to the input SVG file containing rectangular paths.
     outfile     Path to the output G-code file.
 Options:
-    --idle_z    Safe Z height for non-cutting moves (default: 1.000in).
-    --pass_z    Passing Z height for rapid moves (default: 0.100in).
+    --idle_z    Safe Z height for non-cutting moves (default: 0.500in).
+    --pass_z    Passing Z height for rapid moves (default: 0.050in).
     --cut_z     Cutting Z height for material removal (default: -0.000in).
     --spindle   Spindle speed in RPM (default: 10000).
     --tool_dia  Tool diameter in inches (default: 0.015in).
     --overlap   Tool overlap between passes as a fraction (default: 0.15).
     --xy_speed  XY cutting speed in inches per minute (default: 4.0ipm).
-    --z_speed   Z cutting speed in inches per minute (default: 0.40ipm).
+    --z_speed   Z cutting speed in inches per minute (default: 2.0ipm).
 
 Notes:
 - Sets the G-code units based on the SVG units, defaulting to millimeters if unrecognized.
@@ -40,18 +41,17 @@ Raises:
 - ValueError: If the input file format is invalid or unsupported.
 """
 
-
-parser = argparse.ArgumentParser(description="Convert SVG paths to G-code spirals")
+parser = argparse.ArgumentParser(description=f"Convert SVG paths to G-code spirals (v{Version})")
 parser.add_argument("infile", help="SVG file to process")
 parser.add_argument("outfile", help="Output G-code filename")
-parser.add_argument("--idle_z", type=float, default=1.000, help="Safe Z height (default: 1.000in)")
-parser.add_argument("--pass_z", type=float, default=0.100, help="Passing Z height (default: 0.100in)")
+parser.add_argument("--idle_z", type=float, default=0.500, help="Safe Z height (default: 0.500in)")
+parser.add_argument("--pass_z", type=float, default=0.050, help="Passing Z height (default: 0.050in)")
 parser.add_argument("--cut_z", type=float, default=-0.000, help="Cutting Z height (default: -0.000in)")
 parser.add_argument("--spindle", type=int, default=10000, help="Spindle speed in RPM (default: 10000)")
 parser.add_argument("--tool_dia", type=float, default=0.015, help="Tool diameter (default: 0.015in)")
 parser.add_argument("--overlap", type=float, default=0.15, help="Tool overlap b/t passes as a fraction (default: 0.15)")
 parser.add_argument("--xy_speed", type=float, default=4.0, help="XY cutting speed (default: 4.0ipm)")
-parser.add_argument("--z_speed", type=float, default=0.40, help="Z cutting speed (default: 0.40ipm)")
+parser.add_argument("--z_speed", type=float, default=2.0, help="Z cutting speed (default: 2.0ipm)")
 # TODO: parser.add_argument("--units", type=str, default="", help="Units (in or mm) (default: determined by SVG)")
 
 args = parser.parse_args()
@@ -267,9 +267,7 @@ def generate_rectangular_spiral(x_min, y_min, x_max, y_max):
     return path_data
 
 def write_gcode_line(file, command="", comment=None):
-    """
-    Writes a single line of G-code to the specified file.
-    """
+    """ Writes a single line of G-code to the specified file. """
     line = command
     if comment:
         line = f"{line:<{gcode.comment_pos}}; {comment}"
@@ -323,17 +321,9 @@ def write_gcode_spirals(outfile, rectangles):
         write_gcode_line(file, f"G0 X0 Y0")
         write_gcode_line(file)
 
-def convert_svg_to_spirals(infile, outfile):
+
+if __name__ == "__main__":
     """
-    Convert SVG paths to spiraling paths and save as G-code.
-
-    This function processes an input SVG file, extracts rectangular paths, and converts them into spiraling paths. 
-    The resulting G-code is saved to the specified output file.
-
-    Args:
-        infile (str): The path to the input SVG file containing rectangular paths.
-        outfile (str): The path to the output file where the generated G-code will be saved.
-
     Workflow:
     1. Parses rectangles from the input SVG file.
     2. Sorts the rectangles by proximity to optimize the path.
@@ -348,10 +338,14 @@ def convert_svg_to_spirals(infile, outfile):
     Raises:
         FileNotFoundError: If the input SVG file does not exist.
         ValueError: If the input file format is invalid or unsupported.
-
     """
+
+    if len(vars(args)) == 0:
+        parser.print_help()
+        exit(1)
+    
     # Parse rectangles from the input SVG
-    rectangles = parse_svg_rectangles(infile)
+    rectangles = parse_svg_rectangles(args.infile)
 
     print(f"SVG units: {config.svg_units}")
     if rectangles:
@@ -363,7 +357,7 @@ def convert_svg_to_spirals(infile, outfile):
               f"({x_min:{gcode.coord_fmt}}, {y_min:{gcode.coord_fmt}}), ({x_max:{gcode.coord_fmt}}, {y_max:{gcode.coord_fmt}})")
     else:
         print("No rectangles found.")
-        return
+        exit(1)
 
     # Sort rectangles by proximity
     rectangles = sort_rectangles(rectangles)
@@ -379,14 +373,7 @@ def convert_svg_to_spirals(infile, outfile):
     # TODO: if gcode.units != config.svg_units, a conversion has to be done in generate_rectangular_spiral & write_gcode_spirals (?)
 
     # Convert rectangles to spirals and write them out
-    write_gcode_spirals(outfile, rectangles)
+    write_gcode_spirals(args.outfile, rectangles)
 
-    print(f"G-code saved as '{outfile}', units: {gcode.units}")
-
-if __name__ == "__main__":
-
-    if len(vars(args)) == 0:
-        parser.print_help()
-        exit(1)
+    print(f"G-code saved as '{args.outfile}', units: {gcode.units}")
     
-    convert_svg_to_spirals(args.infile, args.outfile)
