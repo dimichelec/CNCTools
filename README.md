@@ -1,6 +1,6 @@
 # CNCTools
 
-## svg_cutout.py
+## svg_cutout.py v0.2
 This script converts SVG paths into G-code spirals for CNC machining.
 I originally wrote this to remove solder mask from the pads on a PCB using CNC machining.
 
@@ -22,7 +22,7 @@ is saved to an output file.
     --xy_speed  XY cutting speed in inches per minute (default: 4.0ipm).
     --z_speed   Z cutting speed in inches per minute (default: 0.40ipm).
 
-## test_pattern.py
+## test_pattern.py v0.2
 This script generates a CNC test pattern in G-code to used in testing V bit carving of copper cladded board
 generally used in creating PCBs.
 
@@ -49,7 +49,9 @@ grid Y axis.
     --x_start         Starting X coordinate for the pattern (default: -0.150in)
     --y_start         Starting Y coordinate for the pattern (default: 0.000in)
     --square_size     Square side length (default: 0.050in)
+    --fill_square     Fill square: 0 - no, 1 - yes (default: 0)
+    --fill_overlap    Overlap when filling square (default: 0.4)  
     --gap_size        Gap size between squares (default: 0.050in)
     --x_idle          Idle/safe X height (default: 0.000in)
     --y_idle          Idle/safe Y height (default: 0.000in)
-    --z_idle          Idle/safe Z height (default: 0.500in)
+    --z_idle          Idle/safe Z height (default: 0.500in)    
