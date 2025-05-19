@@ -1,7 +1,8 @@
 import math
 import argparse
+import sys
 
-Version = 0.1
+Version = 0.2
 
 """
 This script generates a CNC test pattern in G-code to used in testing V bit carving of copper cladded board
@@ -31,6 +32,8 @@ Options:
     --x_start         Starting X coordinate for the pattern (default: -0.150in)
     --y_start         Starting Y coordinate for the pattern (default: 0.000in)
     --square_size     Square side length (default: 0.050in)
+    --fill_square     Fill square: 0 - no, 1 - yes (default: 0)
+    --fill_overlap    Overlap when filling square (default: 0.4)  
     --gap_size        Gap size between squares (default: 0.050in)
     --x_idle          Idle/safe X height (default: 0.000in)
     --y_idle          Idle/safe Y height (default: 0.000in)
@@ -57,6 +60,8 @@ parser.add_argument("--z_speed", type=float, default=2.0, help="Z cutting speed 
 parser.add_argument("--x_start", type=float, default=-0.150, help="Starting X coordinate for the pattern (default: -0.150in)")
 parser.add_argument("--y_start", type=float, default=0.0, help="Starting Y coordinate for the pattern (default: 0.000in)")
 parser.add_argument("--square_size", type=float, default=0.050, help="Square side length (default: 0.050in)")
+parser.add_argument("--fill_square", type=int, default=0, help="Fill square: 0 - no, 1 - yes (default: 0)")
+parser.add_argument("--fill_step", type=float, default=0.004, help="Step size when filling square (default: 0.004in)")
 parser.add_argument("--gap_size", type=float, default=0.050, help="Gap size between squares (default: 0.050in)")
 parser.add_argument("--x_idle", type=float, default=0.000, help="Idle/safe X coordinate (default: 0.000in)")
 parser.add_argument("--y_idle", type=float, default=0.000, help="Idle/safe Y coordinate (default: 0.000in)")
@@ -82,6 +87,8 @@ class Config:
         self.x_start = args.x_start
         self.y_start = args.y_start
         self.square_size = args.square_size
+        self.fill_square = args.fill_square
+        self.fill_step = args.fill_step
         self.gap_size = args.gap_size
         self.x_idle = args.x_idle
         self.y_idle = args.y_idle
@@ -96,11 +103,13 @@ class Gcode:
         self.units = "in"           # "in" or "mm"
         self.coord_fmt = ".5f"      # coordinate format
         self.speed_fmt = ".4f"      # speed format
-        self.rpm_fmt = "d"         # spindle speed format
+        self.rpm_fmt = "d"          # spindle speed format
         self.comment_pos = 8        # position of comments
 
 gcode = Gcode()
 
+
+# Writes a single line of G-code (with optional comment) to the specified file.
 def write_gcode_line(file, command="", comment=None):
     """ Writes a single line of G-code to the specified file. """
     line = command
@@ -108,12 +117,17 @@ def write_gcode_line(file, command="", comment=None):
         line = f"{line:<{gcode.comment_pos}}; {comment}"
     file.write(line + "\n")
 
+
+# Writes G-code to 'outfile' for a grid of squares with optional filling, using provided sweep descriptions and square parameters.
 def write_squares(outfile, x_sweep_str, y_sweep_str, squares):
 
     with open(outfile, 'w') as file:
 
         write_gcode_line(file)
 
+        write_gcode_line(file, f"; {cmdline_str}")
+
+        write_gcode_line(file)
         write_gcode_line(file, "G20", "inches")
         write_gcode_line(file, "G90", "absolute coordinates")
         write_gcode_line(file, "G94", "units per minute feedrates")
@@ -135,10 +149,27 @@ def write_squares(outfile, x_sweep_str, y_sweep_str, squares):
 
             write_gcode_line(file, f"G0 X{x: = {gcode.coord_fmt}} Y{y: = {gcode.coord_fmt}}")
             write_gcode_line(file, f"G1 Z{z_cut: = {gcode.coord_fmt}} F{config.z_speed:{gcode.speed_fmt}}")
-            write_gcode_line(file, f"G1 X{x + config.square_size: = {gcode.coord_fmt}} Y{y: = {gcode.coord_fmt}} F{xy_speed:{gcode.speed_fmt}}")
-            write_gcode_line(file, f"   Y{y + config.square_size: = {gcode.coord_fmt}}")
-            write_gcode_line(file, f"   X{x: = {gcode.coord_fmt}}")
-            write_gcode_line(file, f"   Y{y: = {gcode.coord_fmt}}")
+
+            if config.fill_square:
+                # Ensure at least one pass
+                num_passes = max(1, int(math.ceil(config.square_size / config.fill_step)))
+                for i in range(num_passes):
+                    y0 = y + i * config.fill_step
+                    y1 = min(y + config.square_size, y0 + config.fill_step)
+                    if i % 2 == 0:
+                        # Left to right
+                        write_gcode_line(file, f"G1 X{x: = {gcode.coord_fmt}} Y{y0: = {gcode.coord_fmt}} F{xy_speed:{gcode.speed_fmt}}")
+                        write_gcode_line(file, f"   X{x + config.square_size: = {gcode.coord_fmt}} Y{y0: = {gcode.coord_fmt}}")
+                    else:
+                        # Right to left
+                        write_gcode_line(file, f"G1 X{x + config.square_size: = {gcode.coord_fmt}} Y{y0: = {gcode.coord_fmt}} F{xy_speed:{gcode.speed_fmt}}")
+                        write_gcode_line(file, f"   X{x: = {gcode.coord_fmt}} Y{y0: = {gcode.coord_fmt}}")
+            else:
+                write_gcode_line(file, f"G1 X{x + config.square_size: = {gcode.coord_fmt}} Y{y: = {gcode.coord_fmt}} F{xy_speed:{gcode.speed_fmt}}")
+                write_gcode_line(file, f"   Y{y + config.square_size: = {gcode.coord_fmt}}")
+                write_gcode_line(file, f"   X{x: = {gcode.coord_fmt}}")
+                write_gcode_line(file, f"   Y{y: = {gcode.coord_fmt}}")
+
             write_gcode_line(file, f"G0 Z{config.z_pass: = {gcode.coord_fmt}}")
             write_gcode_line(file)
 
@@ -146,6 +177,7 @@ def write_squares(outfile, x_sweep_str, y_sweep_str, squares):
         write_gcode_line(file, f"G0 X{config.x_idle: = {gcode.coord_fmt}} Y{config.y_idle: = {gcode.coord_fmt}}")
         write_gcode_line(file, "M5")
         write_gcode_line(file)
+
 
 # Helper function to generate sweep description strings
 def generate_sweep_string(axis, mode, steps):
@@ -176,6 +208,9 @@ if __name__ == "__main__":
     if len(vars(args)) == 0:
         parser.print_help()
         exit(1)
+
+    # Create a printable string of the command-line call that ran this program
+    cmdline_str = " ".join([sys.executable] + sys.argv)
 
     # Generate X and Y sweep description strings
     x_sweep_str = generate_sweep_string("X", config.x_mode, config.x_steps)
