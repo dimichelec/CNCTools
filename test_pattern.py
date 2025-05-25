@@ -2,7 +2,7 @@ import math
 import argparse
 import sys
 
-Version = 0.2
+Version = "0.2.2"
 
 """
 This script generates a CNC test pattern in G-code to used in testing V bit carving of copper cladded board
@@ -97,7 +97,6 @@ class Config:
 
 config = Config()
 
-
 class Gcode:
     def __init__(self):
         self.units = "in"           # "in" or "mm"
@@ -108,7 +107,6 @@ class Gcode:
 
 gcode = Gcode()
 
-
 # Writes a single line of G-code (with optional comment) to the specified file.
 def write_gcode_line(file, command="", comment=None):
     """ Writes a single line of G-code to the specified file. """
@@ -117,7 +115,6 @@ def write_gcode_line(file, command="", comment=None):
         line = f"{line:<{gcode.comment_pos}}; {comment}"
     file.write(line + "\n")
 
-
 # Writes G-code to 'outfile' for a grid of squares with optional filling, using provided sweep descriptions and square parameters.
 def write_squares(outfile, x_sweep_str, y_sweep_str, squares):
 
@@ -125,9 +122,6 @@ def write_squares(outfile, x_sweep_str, y_sweep_str, squares):
 
         write_gcode_line(file)
 
-        write_gcode_line(file, f"; {cmdline_str}")
-
-        write_gcode_line(file)
         write_gcode_line(file, "G20", "inches")
         write_gcode_line(file, "G90", "absolute coordinates")
         write_gcode_line(file, "G94", "units per minute feedrates")
@@ -135,6 +129,9 @@ def write_squares(outfile, x_sweep_str, y_sweep_str, squares):
 
         write_gcode_line(file, f"; {x_sweep_str}")
         write_gcode_line(file, f"; {y_sweep_str}")
+        write_gcode_line(file)
+        write_gcode_line(file, "; Args:")
+        [write_gcode_line(file, f"; {line}") for line in cmdline_str]
         write_gcode_line(file)
 
         write_gcode_line(file, f"G0 Z{config.z_idle: = {gcode.coord_fmt}}")
@@ -178,7 +175,6 @@ def write_squares(outfile, x_sweep_str, y_sweep_str, squares):
         write_gcode_line(file, "M5")
         write_gcode_line(file)
 
-
 # Helper function to generate sweep description strings
 def generate_sweep_string(axis, mode, steps):
     if mode == 0:
@@ -192,6 +188,28 @@ def generate_sweep_string(axis, mode, steps):
     values = ", ".join([f"{start + i * step:{fmt}}" for i in range(steps)])
     return f"{f'Sweeping {param_name} over {axis} axis:':<30} [{values}]"
 
+# Generate an array of strings reporting the command-line arguments used
+def build_cmdline_str(argv, outfile):
+    """
+    Build a list of strings representing the command-line call, each <= 80 chars,
+    not splitting arguments. Exclude outfile argument.
+    """
+    cmdline_str = []
+    current = ""
+    for arg in argv:
+        if arg == outfile:
+            continue
+        if current and len(current) + 1 + len(arg) > 80:
+            cmdline_str.append(current)
+            current = arg
+        else:
+            if current:
+                current += " " + arg
+            else:
+                current = arg
+    if current:
+        cmdline_str.append(current)
+    return cmdline_str
 
 if __name__ == "__main__":
     """
@@ -210,7 +228,7 @@ if __name__ == "__main__":
         exit(1)
 
     # Create a printable string of the command-line call that ran this program
-    cmdline_str = " ".join([sys.executable] + sys.argv)
+    cmdline_str = build_cmdline_str(sys.argv[1:], args.outfile)
 
     # Generate X and Y sweep description strings
     x_sweep_str = generate_sweep_string("X", config.x_mode, config.x_steps)
