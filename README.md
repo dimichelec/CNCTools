@@ -22,13 +22,12 @@ is saved to an output file.
     --xy_speed  XY cutting speed in inches per minute (default: 4.0ipm).
     --z_speed   Z cutting speed in inches per minute (default: 0.40ipm).
 
-## test_pattern.py v0.2.2
+## test_pattern.py v0.3.0
 This script generates a CNC test pattern in G-code to used in testing V bit carving of copper cladded board
 generally used in creating PCBs.
 
-It creates a grid of squares in quadrant II, to the left of the typical board area in quadrant I. The grid
-of squares could test two factors, for example, Z cutting depth on the grid X axis, and XY speed on the
-grid Y axis.
+It creates a grid of squares testing two factors, for example, Z cutting depth on the grid X axis, and XY speed
+on the grid Y axis.
 ### Usage
     python test_pattern.py <outfile> [options]
 ### Arguments
@@ -40,18 +39,21 @@ grid Y axis.
     --xy_speed_step   Increment in XY cutting speed for each pass (default: 0.0ipm)
     --spindle_start   Initial spindle speed (default: 10000rpm)
     --spindle_step    Increment in spindle speed for each pass (default: 0rpm)
-    --x_mode          Parameter to sweep over X axis: 0 - none, 1 - z_cut, 2 - xy_speed, 3 - spindle (default: 1)
+    --x_mode          Parameter to sweep over X axis: 0 - none, 1 - z_cut, 2 - xy_speed, 3 - spindle, 4 - fill_step (default: 1)
     --x_steps         Grid steps on the X axis (default: 3)
-    --y_mode          Parameter to sweep over Y axis: 0 - none, 1 - z_cut, 2 - xy_speed, 3 - spindle (default: 2)
+    --y_mode          Parameter to sweep over Y axis: 0 - none, 1 - z_cut, 2 - xy_speed, 3 - spindle, 4 - fill_step (default: 2)
     --y_steps         Grid steps on the Y axis (default: 3)
     --z_pass          Passing Z height for rapid moves (default: 0.050in)
     --z_speed         Z-axis cutting speed (default: 2.0ipm)
-    --x_start         Starting X coordinate for the pattern (default: -0.150in)
-    --y_start         Starting Y coordinate for the pattern (default: 0.000in)
     --square_size     Square side length (default: 0.050in)
     --fill_square     Fill square: 0 - no, 1 - yes (default: 0)
-    --fill_overlap    Overlap when filling square (default: 0.4)  
+    --fill_step_start Step size when filling square start (default: 0.004in)
+    --fill_step_step  Step size when filling square step (default: 0.000in)
     --gap_size        Gap size between squares (default: 0.050in)
     --x_idle          Idle/safe X height (default: 0.000in)
     --y_idle          Idle/safe Y height (default: 0.000in)
-    --z_idle          Idle/safe Z height (default: 0.500in)    
+    --z_idle          Idle/safe Z height (default: 0.500in)
+    --quadrant        Quadrant of grid: 1 = +X/+Y, 2 = -X/+Y, 3 = -X/-Y, 4 = +X/-Y (default: 2)
+    --x_start         Starting X coordinate for the pattern (default: -0.150in)
+    --y_start         Starting Y coordinate for the pattern (default: 0.000in)
+
