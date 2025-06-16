@@ -2,7 +2,7 @@ import math
 import argparse
 import sys
 
-Version = "0.3.1"
+Version = "0.3.2"
 
 """
 This script generates a CNC test pattern in G-code to used in testing V bit carving of copper cladded board
@@ -146,6 +146,7 @@ def write_squares(outfile, x_sweep_str, y_sweep_str, squares):
         write_gcode_line(file)
 
         last_spindle = config.spindle_start
+        first_square = True
         for square in squares:
             x, y, z_cut, xy_speed, spindle, fill_step = square
 
@@ -156,7 +157,10 @@ def write_squares(outfile, x_sweep_str, y_sweep_str, squares):
                 last_spindle = spindle
 
             write_gcode_line(file, f"G0 X{x: = {gcode.coord_fmt}} Y{y: = {gcode.coord_fmt}}")
-            write_gcode_line(file, f"G0 Z{config.z_idle: = {gcode.coord_fmt}}")
+            if first_square:
+                write_gcode_line(file, f"G0 Z{config.z_pass: = {gcode.coord_fmt}}")
+                first_square = False
+
             write_gcode_line(file, f"G1 Z{z_cut: = {gcode.coord_fmt}} F{config.z_speed:{gcode.speed_fmt}}")
 
             if config.fill_square:
