@@ -22,7 +22,7 @@ is saved to an output file.
     --xy_speed  XY cutting speed in inches per minute (default: 4.0ipm).
     --z_speed   Z cutting speed in inches per minute (default: 0.40ipm).
 
-## test_pattern.py v0.3.1
+## test_pattern.py v0.3.2
 This script generates a CNC test pattern in G-code to used in testing V bit carving of copper cladded board
 generally used in creating PCBs.
 
