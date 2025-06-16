@@ -3,30 +3,32 @@ from lxml import etree
 import argparse
 import sys
 
-Version = 0.2
+Version = 0.3
 
 """
-This script converts SVG paths into G-code spirals for CNC machining.
+This script converts SVG paths into G-code filled rectangles for CNC machining.
 I originally wrote this to remove solder mask from the pads on a PCB using CNC machining.
 
 The script processes an input SVG file to extract rectangular paths, sorts them to minimize travel distance, 
-and generates G-code commands to create spiraling paths that cover the rectangular areas. The resulting G-code 
-is saved to an output file.
+and generates G-code commands to create spiraling or raster sweep paths that cover the rectangular areas.
+The resulting G-code is saved to an output file.
 
 Usage:
     python svg_cutout.py <infile> <outfile> [options]
 Arguments:
-    infile      Path to the input SVG file containing rectangular paths.
-    outfile     Path to the output G-code file.
+    infile          Path to the input SVG file containing rectangular paths.
+    outfile         Path to the output G-code file.
 Options:
-    --idle_z    Safe Z height for non-cutting moves (default: 0.500in).
-    --pass_z    Passing Z height for rapid moves (default: 0.050in).
-    --cut_z     Cutting Z height for material removal (default: -0.000in).
-    --spindle   Spindle speed in RPM (default: 10000).
-    --tool_dia  Tool diameter in inches (default: 0.015in).
-    --overlap   Tool overlap between passes as a fraction (default: 0.15).
-    --xy_speed  XY cutting speed in inches per minute (default: 4.0ipm).
-    --z_speed   Z cutting speed in inches per minute (default: 2.0ipm).
+    --idle_z        Safe Z height for non-cutting moves (default: 0.500in)
+    --pass_z        Passing Z height for rapid moves (default: 0.050in)
+    --cut_z         Cutting Z height for material removal (default: 0.000in)
+    --spindle       Spindle speed in RPM (default: 10000)
+    --tool_dia      Tool diameter in inches (default: 0.015in)
+    --overlap       Tool overlap between passes as a fraction (default: 0.15)
+    --xy_speed      XY cutting speed in inches per minute (default: 4.0ipm)
+    --z_speed       Z cutting speed in inches per minute (default: 2.0ipm)
+    --shape         Shape of cutout: 1=spiral-in, 2=raster (default: 1)
+    --raster_mode   Raster sweep mode: 0=auto, 1=vertical, 2=horizontal (default: 0)
 
 Notes:
 - Sets the G-code units based on the SVG units, defaulting to millimeters if unrecognized.
@@ -46,12 +48,14 @@ parser.add_argument("infile", help="SVG file to process")
 parser.add_argument("outfile", help="Output G-code filename")
 parser.add_argument("--idle_z", type=float, default=0.500, help="Safe Z height (default: 0.500in)")
 parser.add_argument("--pass_z", type=float, default=0.050, help="Passing Z height (default: 0.050in)")
-parser.add_argument("--cut_z", type=float, default=-0.000, help="Cutting Z height (default: -0.000in)")
+parser.add_argument("--cut_z", type=float, default=0.000, help="Cutting Z height (default: 0.000in)")
 parser.add_argument("--spindle", type=int, default=10000, help="Spindle speed in RPM (default: 10000)")
 parser.add_argument("--tool_dia", type=float, default=0.015, help="Tool diameter (default: 0.015in)")
 parser.add_argument("--overlap", type=float, default=0.15, help="Tool overlap b/t passes as a fraction (default: 0.15)")
 parser.add_argument("--xy_speed", type=float, default=4.0, help="XY cutting speed (default: 4.0ipm)")
 parser.add_argument("--z_speed", type=float, default=2.0, help="Z cutting speed (default: 2.0ipm)")
+parser.add_argument("--shape", type=int, default=1, help="Shape of cutout: 1=spiral-in, 2=vertical raster (default: 1)")
+parser.add_argument("--raster_mode", type=int, default=0, help="Raster sweep mode: 0=auto, 1=vertical, 2=horizontal (default: 0)")
 # TODO: parser.add_argument("--units", type=str, default="", help="Units (in or mm) (default: determined by SVG)")
 
 args = parser.parse_args()
@@ -68,6 +72,8 @@ class Config:
         self.overlap = args.overlap
         self.xy_speed = args.xy_speed
         self.z_speed = args.z_speed
+        self.shape = args.shape
+        self.raster_mode = args.raster_mode
         # TODO: units = args.units
 
 config = Config()
@@ -222,13 +228,13 @@ def generate_rectangular_spiral(x_min, y_min, x_max, y_max):
     y_top = y_max - (config.tool_dia / 2)
 
     # Move to the starting point
-    path_data.append(f"G0 X{x_left:{gcode.coord_fmt}} Y{y_bottom:{gcode.coord_fmt}}")
+    path_data.append(f"G0 X {x_left:{gcode.coord_fmt}} Y {y_bottom:{gcode.coord_fmt}}")
 
     # First loop: trace the full rectangle perimeter
-    path_data.append(f"G1 X{x_right:{gcode.coord_fmt}} Y{y_bottom:{gcode.coord_fmt}} F{config.xy_speed:{gcode.speed_fmt}}")
-    path_data.append(f"G1 X{x_right:{gcode.coord_fmt}} Y{y_top:{gcode.coord_fmt}} F{config.xy_speed:{gcode.speed_fmt}}")
-    path_data.append(f"G1 X{x_left:{gcode.coord_fmt}} Y{y_top:{gcode.coord_fmt}} F{config.xy_speed:{gcode.speed_fmt}}")
-    path_data.append(f"G1 X{x_left:{gcode.coord_fmt}} Y{y_bottom:{gcode.coord_fmt}} F{config.xy_speed:{gcode.speed_fmt}}")
+    path_data.append(f"G1 X {x_right:{gcode.coord_fmt}} Y {y_bottom:{gcode.coord_fmt}} F {config.xy_speed:{gcode.speed_fmt}}")
+    path_data.append(f"   X {x_right:{gcode.coord_fmt}} Y {y_top:{gcode.coord_fmt}}")
+    path_data.append(f"   X {x_left:{gcode.coord_fmt}} Y {y_top:{gcode.coord_fmt}}")
+    path_data.append(f"   X {x_left:{gcode.coord_fmt}} Y {y_bottom:{gcode.coord_fmt}}")
 
     # Move inward for the spiral
     x_left += step_size
@@ -238,22 +244,22 @@ def generate_rectangular_spiral(x_min, y_min, x_max, y_max):
 
     # # Jog to next part if we're not out of space in this rectangle
     # if (x_left < x_right and y_bottom < y_top):
-    path_data.append(f"G1 X{x_left:{gcode.coord_fmt}} Y{y_bottom:{gcode.coord_fmt}} F{config.xy_speed:{gcode.speed_fmt}}")
+    path_data.append(f"   X {x_left:{gcode.coord_fmt}} Y {y_bottom:{gcode.coord_fmt}}")
 
     first_pass = True
     while True:
         # Bottom edge, right edge
-        path_data.append(f"G1 X{x_right:{gcode.coord_fmt}} Y{y_bottom:{gcode.coord_fmt}} F{config.xy_speed:{gcode.speed_fmt}}")
-        path_data.append(f"G1 X{x_right:{gcode.coord_fmt}} Y{y_top:{gcode.coord_fmt}} F{config.xy_speed:{gcode.speed_fmt}}")
+        path_data.append(f"   X {x_right:{gcode.coord_fmt}} Y {y_bottom:{gcode.coord_fmt}}")
+        path_data.append(f"   X {x_right:{gcode.coord_fmt}} Y {y_top:{gcode.coord_fmt}}")
 
         # if this finished our fill, break the loop
         if ((x_right - x_left) < step_size) or ((y_top - y_bottom) < step_size):
             break
 
         # Top edge, left edge
-        path_data.append(f"G1 X{x_left:{gcode.coord_fmt}} Y{y_top:{gcode.coord_fmt}} F{config.xy_speed:{gcode.speed_fmt}}")
+        path_data.append(f"   X {x_left:{gcode.coord_fmt}} Y {y_top:{gcode.coord_fmt}}")
         y_bottom += step_size if y_bottom < (y_mid - step_size) else 0
-        path_data.append(f"G1 X{x_left:{gcode.coord_fmt}} Y{y_bottom:{gcode.coord_fmt}} F{config.xy_speed:{gcode.speed_fmt}}")
+        path_data.append(f"   X {x_left:{gcode.coord_fmt}} Y {y_bottom:{gcode.coord_fmt}}")
 
         # if this finished our fill, break the loop
         if ((y_top - y_bottom) < step_size):
@@ -266,6 +272,77 @@ def generate_rectangular_spiral(x_min, y_min, x_max, y_max):
 
     return path_data
 
+def generate_raster(x_min, y_min, x_max, y_max, mode=0):
+    """
+    Generate a raster path to fully cover the given rectangle area.
+
+    Args:
+        x_min, y_min, x_max, y_max: Rectangle bounds.
+        mode: 0=auto, 1=vertical, 2=horizontal
+
+    Returns:
+        A list of G-code commands representing the raster path.
+    """
+    path_data = []
+    step_size = config.tool_dia * (1 - config.overlap)
+
+    width = x_max - x_min
+    height = y_max - y_min
+
+    # Determine sweep direction
+    if mode == 0:
+        direction = 1 if height >= width else 2
+    else:
+        direction = mode
+
+    if direction == 1:  # Vertical sweep
+        x = x_min + (config.tool_dia / 2)
+        x_right = x_max - (config.tool_dia / 2)
+        y_start = y_min + (config.tool_dia / 2)
+        y_end = y_max - (config.tool_dia / 2)
+        path_data.append(f"G0 X {x:{gcode.coord_fmt}} Y {y_start:{gcode.coord_fmt}}")
+        first_line = True
+        while x <= x_right:
+            # Down (or up) the column, only add feedrate on the first G1 of this block
+            if first_line:
+                path_data.append(f"G1 X {x:{gcode.coord_fmt}} Y {y_end:{gcode.coord_fmt}} F {config.xy_speed:{gcode.speed_fmt}}")
+                first_line = False
+            else:
+                path_data.append(f"   X {x:{gcode.coord_fmt}} Y {y_end:{gcode.coord_fmt}}")
+            x += step_size
+            if x <= x_right:
+                # Move to next column at y_start using G1
+                path_data.append(f"   X {x:{gcode.coord_fmt}} Y {y_end:{gcode.coord_fmt}}")
+                path_data.append(f"   X {x:{gcode.coord_fmt}} Y {y_start:{gcode.coord_fmt}}")
+                x += step_size
+                if x <= x_right:
+                    path_data.append(f"   X {x:{gcode.coord_fmt}} Y {y_start:{gcode.coord_fmt}}")
+
+    else:  # Horizontal sweep
+        y = y_min + (config.tool_dia / 2)
+        y_top = y_max - (config.tool_dia / 2)
+        x_start = x_min + (config.tool_dia / 2)
+        x_end = x_max - (config.tool_dia / 2)
+        path_data.append(f"G0 X {x_start:{gcode.coord_fmt}} Y {y:{gcode.coord_fmt}}")
+        first_line = True
+        while y <= y_top:
+            # Across the row, only add feedrate on the first G1 of this block
+            if first_line:
+                path_data.append(f"G1 X {x_end:{gcode.coord_fmt}} Y {y:{gcode.coord_fmt}} F {config.xy_speed:{gcode.speed_fmt}}")
+                first_line = False
+            else:
+                path_data.append(f"   X {x_end:{gcode.coord_fmt}} Y {y:{gcode.coord_fmt}}")
+            y += step_size
+            if y <= y_top:
+                # Move to next row at x_start using G1
+                path_data.append(f"   X {x_end:{gcode.coord_fmt}} Y {y:{gcode.coord_fmt}}")
+                path_data.append(f"   X {x_start:{gcode.coord_fmt}} Y {y:{gcode.coord_fmt}}")
+                y += step_size
+                if y <= y_top:
+                    path_data.append(f"   X {x_start:{gcode.coord_fmt}} Y {y:{gcode.coord_fmt}}")
+
+    return path_data
+
 def write_gcode_line(file, command="", comment=None):
     """ Writes a single line of G-code to the specified file. """
     line = command
@@ -273,12 +350,12 @@ def write_gcode_line(file, command="", comment=None):
         line = f"{line:<{gcode.comment_pos}}; {comment}"
     file.write(line + "\n")
 
-def write_gcode_spirals(outfile, rectangles):
+def write_gcode_fills(outfile, rectangles):
     """
-    Convert a list of rectangles to spiral paths and write them into a G-code file.
+    Convert a list of rectangles to spiral or raster paths and write them into a G-code file.
 
     This function takes a list of rectangles, where each is represented as a tuple 
-    (x_min, y_min, width, height). Each is converted to a spiral path convering its area.
+    (x_min, y_min, width, height). Each is converted to a cutout path convering its area.
     The corresponding G-code commands are written to the specified output file, ensuring
     proper formatting and compatibility with the configured units.
 
@@ -291,36 +368,74 @@ def write_gcode_spirals(outfile, rectangles):
         None
     """
     with open(outfile, 'w') as file:
-        if gcode.units == "in":
-            write_gcode_line(file, "G20", "Set units to inches")
-        else:
-            write_gcode_line(file, "G21", "Set units to millimeters")
-
-        write_gcode_line(file, "G90", "Absolute positioning")
-        write_gcode_line(file, f"G0 Z{config.idle_z:{gcode.coord_fmt}}")
-        write_gcode_line(file, f"M3 S{config.spindle}", "Turn spindle on")
 
         write_gcode_line(file)
-        write_gcode_line(file, f"G0 Z{config.pass_z:{gcode.coord_fmt}}")
+
+        if gcode.units == "in":
+            write_gcode_line(file, "G20", "inches")
+        else:
+            write_gcode_line(file, "G21", "millimeters")
+
+        write_gcode_line(file, "G90", "absolute coordinates")
+        write_gcode_line(file, "G94", "units per minute feedrates")
+        write_gcode_line(file)
+
+        write_gcode_line(file, "; Args:")
+        [write_gcode_line(file, f"; {line}") for line in cmdline_str]
+        write_gcode_line(file)
+
+        write_gcode_line(file, f"G0 Z {config.idle_z:{gcode.coord_fmt}}")
+        write_gcode_line(file, f"M3 S {config.spindle}", "Turn spindle on")
+        write_gcode_line(file, "G4 P 2", "2sec pause")   # Pause for the spindle to get to speed
+
+        write_gcode_line(file)
+        write_gcode_line(file, f"G0 Z {config.pass_z:{gcode.coord_fmt}}")
 
         for rect in rectangles:
             x, y, w, h = rect
             x_min, y_min = x, y
             x_max, y_max = x + w, y + h
             print(f"Processing rectangle: ({x_min:{gcode.coord_fmt}}, {y_min:{gcode.coord_fmt}}), ({x_max:{gcode.coord_fmt}}, {y_max:{gcode.coord_fmt}})")
-            spiral = generate_rectangular_spiral(x_min, y_min, x_max, y_max)
-            write_gcode_line(file, spiral[0])  # Move to the starting point
-            write_gcode_line(file, f"G1 Z{config.cut_z:{gcode.coord_fmt}} F{config.z_speed:{gcode.speed_fmt}}")
-            for line in spiral[1:]:
+
+            # Choose fill pattern based on config.shape
+            if config.shape == 2:
+                path = generate_raster(x_min, y_min, x_max, y_max, config.raster_mode)
+            else:
+                path = generate_rectangular_spiral(x_min, y_min, x_max, y_max)
+
+            write_gcode_line(file, path[0])  # Move to the starting point
+            write_gcode_line(file, f"G1 Z {config.cut_z:{gcode.coord_fmt}} F {config.z_speed:{gcode.speed_fmt}}")
+            for line in path[1:]:
                 write_gcode_line(file, line)
-            write_gcode_line(file, f"G0 Z{config.pass_z:{gcode.coord_fmt}}")
+            write_gcode_line(file, f"G0 Z {config.pass_z:{gcode.coord_fmt}}")
             write_gcode_line(file)
 
         write_gcode_line(file, "M5", "Turn spindle off")
-        write_gcode_line(file, f"G0 Z{config.idle_z:{gcode.coord_fmt}}")
-        write_gcode_line(file, f"G0 X0 Y0")
+        write_gcode_line(file, f"G0 Z {config.idle_z:{gcode.coord_fmt}}")
+        write_gcode_line(file, f"G0 X 0 Y 0")
         write_gcode_line(file)
 
+# Generate an array of strings reporting the command-line arguments used
+def build_cmdline_str(argv):
+    """
+    Build a list of strings representing the command-line call, each <= 80 chars,
+    not splitting arguments. Exclude outfile argument.
+    """
+    cmdline_str = []
+    current = ""
+    for i in range(1, len(argv)-2):
+    #for arg in argv:
+        if current and len(current) + 1 + len(argv[i]) > 80:
+            cmdline_str.append(current)
+            current = argv[i]
+        else:
+            if current:
+                current += " " + argv[i]
+            else:
+                current = argv[i]
+    if current:
+        cmdline_str.append(current)
+    return cmdline_str
 
 if __name__ == "__main__":
     """
@@ -340,10 +455,9 @@ if __name__ == "__main__":
         ValueError: If the input file format is invalid or unsupported.
     """
 
-    if len(vars(args)) == 0:
-        parser.print_help()
-        exit(1)
-    
+    # Create a printable string of the command-line call that ran this program
+    cmdline_str = build_cmdline_str(sys.argv)
+
     # Parse rectangles from the input SVG
     rectangles = parse_svg_rectangles(args.infile)
 
@@ -372,8 +486,8 @@ if __name__ == "__main__":
     # TODO: if units = "mm" any arguments that were not entered by user have to be converted to mm from in
     # TODO: if gcode.units != config.svg_units, a conversion has to be done in generate_rectangular_spiral & write_gcode_spirals (?)
 
-    # Convert rectangles to spirals and write them out
-    write_gcode_spirals(args.outfile, rectangles)
+    # Convert rectangles to cutout paths and write them out
+    write_gcode_fills(args.outfile, rectangles)
 
     print(f"G-code saved as '{args.outfile}', units: {gcode.units}")
     
