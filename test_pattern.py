@@ -2,7 +2,7 @@ import math
 import argparse
 import sys
 
-Version = "0.3.2"
+Version = "0.4"
 
 """
 This script generates a CNC test pattern in G-code to used in testing V bit carving of copper cladded board
@@ -14,31 +14,31 @@ on the grid Y axis.
 Usage:
     python test_pattern.py <outfile> [options]
 Arguments:
-    outfile     Path to the output G-code file.
+    outfile             Path to the output G-code file.
 Options:
-    --z_cut_start     Starting depth for cutting operations (default: -0.000in)
-    --z_cut_step      Depth increment for each cutting pass (default: -0.000in)
-    --xy_speed_start  Initial XY cutting speed (default: 4.0ipm)
-    --xy_speed_step   Increment in XY cutting speed for each pass (default: 0.0ipm)
-    --spindle_start   Initial spindle speed (default: 10000rpm)
-    --spindle_step    Increment in spindle speed for each pass (default: 0rpm)
-    --x_mode          Parameter to sweep over X axis: 0 - none, 1 - z_cut, 2 - xy_speed, 3 - spindle, 4 - fill_step (default: 1)
-    --x_steps         Grid steps on the X axis (default: 3)
-    --y_mode          Parameter to sweep over Y axis: 0 - none, 1 - z_cut, 2 - xy_speed, 3 - spindle, 4 - fill_step (default: 2)
-    --y_steps         Grid steps on the Y axis (default: 3)
-    --z_pass          Passing Z height for rapid moves (default: 0.050in)
-    --z_speed         Z-axis cutting speed (default: 2.0ipm)
-    --square_size     Square side length (default: 0.050in)
-    --fill_square     Fill square: 0 - no, 1 - yes (default: 0)
-    --fill_step_start Step size when filling square start (default: 0.004in)
-    --fill_step_step  Step size when filling square step (default: 0.000in)
-    --gap_size        Gap size between squares (default: 0.050in)
-    --x_idle          Idle/safe X height (default: 0.000in)
-    --y_idle          Idle/safe Y height (default: 0.000in)
-    --z_idle          Idle/safe Z height (default: 0.500in)
-    --quadrant        Quadrant of grid: 1 = +X/+Y, 2 = -X/+Y, 3 = -X/-Y, 4 = +X/-Y (default: 2)
-    --x_start         Starting X coordinate for the pattern (default: -0.150in)
-    --y_start         Starting Y coordinate for the pattern (default: 0.000in)
+    --z_cut_start       Starting depth for cutting operations (default: 0.000in)
+    --z_cut_step        Depth increment for each cutting pass (default: 0.000in)
+    --xy_speed_start    Initial XY cutting speed (default: 4.0ipm)
+    --xy_speed_step     Increment in XY cutting speed for each pass (default: 0.0ipm)
+    --spindle_start     Initial spindle speed (default: 10000rpm)
+    --spindle_step      Increment in spindle speed for each pass (default: 0rpm)
+    --x_mode            Parameter to sweep over X axis: 0=none, 1=z_cut, 2=xy_speed, 3=spindle, 4=fill_step (default: 1)
+    --x_steps           Grid steps on the X axis (default: 3)
+    --y_mode            Parameter to sweep over Y axis: 0=none, 1=z_cut, 2=xy_speed, 3=spindle, 4=fill_step (default: 2)
+    --y_steps           Grid steps on the Y axis (default: 3)
+    --z_pass            Passing Z height for rapid moves (default: 0.050in)
+    --z_speed           Z-axis cutting speed (default: 2.0ipm)
+    --square_size       Square side length (default: 0.050in)
+    --fill_square       Fill square: 0=no, 1=yes (default: 0)
+    --fill_step_start   Step size when filling square start (default: 0.004in)
+    --fill_step_step    Step size when filling square step (default: 0.000in)
+    --gap_size          Gap size between squares (default: 0.050in)
+    --x_idle            Idle/safe X height (default: 0.000in)
+    --y_idle            Idle/safe Y height (default: 0.000in)
+    --z_idle            Idle/safe Z height (default: 0.500in)
+    --quadrant          Quadrant of grid: 1=+X/+Y, 2=-X/+Y, 3=-X/-Y, 4=+X/-Y (default: 2)
+    --x_start           Starting X coordinate for the pattern (default: -0.150in)
+    --y_start           Starting Y coordinate for the pattern (default: 0.000in)
 
 Dependencies:
 - Python 3.x
@@ -46,32 +46,31 @@ Dependencies:
 
 parser = argparse.ArgumentParser(description=f"Create a CNC/PCB G-code test pattern (v{Version})")
 parser.add_argument("outfile", help="Output G-code filename")
-parser.add_argument("--z_cut_start", type=float, default=-0.000, help="Cutting Z start depth (default: -0.000in)")
-parser.add_argument("--z_cut_step", type=float, default=-0.000, help="Cutting Z depth step (default: -0.000in)")
+parser.add_argument("--z_cut_start", type=float, default=0.000, help="Cutting Z start depth (default: 0.000in)")
+parser.add_argument("--z_cut_step", type=float, default=0.000, help="Cutting Z depth step (default: 0.000in)")
 parser.add_argument("--xy_speed_start", type=float, default=4.0, help="XY cutting speed start (default: 4.0ipm)")
 parser.add_argument("--xy_speed_step", type=float, default=0.0, help="XY cutting speed step (default: 0.0ipm)")
 parser.add_argument("--spindle_start", type=int, default=10000, help="Spindle speed start (default: 10000rpm)")
 parser.add_argument("--spindle_step", type=int, default=0, help="Spindle speed step (default: 0rpm)")
-parser.add_argument("--x_mode", type=int, default=1, help="Parameter to sweep over X axis: 0 - none, 1 - z_cut, 2 - xy_speed, 3 - spindle, 4 - fill_step (default: 1)")
+parser.add_argument("--x_mode", type=int, default=1, help="Parameter to sweep over X axis: 0=none, 1=z_cut, 2=xy_speed, 3=spindle, 4=fill_step (default: 1)")
 parser.add_argument("--x_steps", type=int, default=3, help="Grid steps on the X axis (default: 3)")
-parser.add_argument("--y_mode", type=int, default=2, help="Parameter to sweep over Y axis: 0 - none, 1 - z_cut, 2 - xy_speed, 3 - spindle, 4 - fill_step (default: 2)")
+parser.add_argument("--y_mode", type=int, default=2, help="Parameter to sweep over Y axis: 0=none, 1=z_cut, 2=xy_speed, 3=spindle, 4=fill_step (default: 2)")
 parser.add_argument("--y_steps", type=int, default=3, help="Grid steps on the Y axis (default: 3)")
 parser.add_argument("--z_pass", type=float, default=0.050, help="Passing Z height (default: 0.050in)")
 parser.add_argument("--z_speed", type=float, default=2.0, help="Z cutting speed (default: 2.0ipm)")
 parser.add_argument("--square_size", type=float, default=0.050, help="Square side length (default: 0.050in)")
-parser.add_argument("--fill_square", type=int, default=0, help="Fill square: 0 - no, 1 - yes (default: 0)")
+parser.add_argument("--fill_square", type=int, default=0, help="Fill square: 0=no, 1=yes (default: 0)")
 parser.add_argument("--fill_step_start", type=float, default=0.004, help="Step size when filling square start (default: 0.004in)")
 parser.add_argument("--fill_step_step", type=float, default=0.000, help="Step size when filling square step (default: 0.000in)")
 parser.add_argument("--gap_size", type=float, default=0.050, help="Gap size between squares (default: 0.050in)")
 parser.add_argument("--x_idle", type=float, default=0.000, help="Idle/safe X coordinate (default: 0.000in)")
 parser.add_argument("--y_idle", type=float, default=0.000, help="Idle/safe Y coordinate (default: 0.000in)")
 parser.add_argument("--z_idle", type=float, default=0.500, help="Idle/safe Z height (default: 0.500in)")
-parser.add_argument("--quadrant", type=int, default=2, help="Quadrant of grid: 1 = +X/+Y, 2 = -X/+Y, 3 = -X/-Y, 4 = +X/-Y (default: 2)")
+parser.add_argument("--quadrant", type=int, default=2, help="Quadrant of grid: 1=+X/+Y, 2=-X/+Y, 3=-X/-Y, 4=+X/-Y (default: 2)")
 parser.add_argument("--x_start", type=float, default=-0.150, help="Starting X coordinate for the pattern (default: -0.150in)")
 parser.add_argument("--y_start", type=float, default=0.0, help="Starting Y coordinate for the pattern (default: 0.000in)")
 
 args = parser.parse_args()
-
 
 class Config:
     def __init__(self):
@@ -98,7 +97,6 @@ class Config:
         self.quadrant = args.quadrant
         self.x_start = args.x_start
         self.y_start = args.y_start
-
         # TODO: units = args.units
 
 config = Config()
@@ -140,9 +138,9 @@ def write_squares(outfile, x_sweep_str, y_sweep_str, squares):
         [write_gcode_line(file, f"; {line}") for line in cmdline_str]
         write_gcode_line(file)
 
-        write_gcode_line(file, f"G0 Z{config.z_idle: = {gcode.coord_fmt}}")
-        write_gcode_line(file, f"M3 S{config.spindle_start:{gcode.rpm_fmt}}")
-        write_gcode_line(file, "G4 P2", "2sec pause")   # Pause for the spindle to get to speed
+        write_gcode_line(file, f"G0 Z {config.z_idle:{gcode.coord_fmt}}")
+        write_gcode_line(file, f"M3 S {config.spindle_start:{gcode.rpm_fmt}}")
+        write_gcode_line(file, "G4 P 2", "2sec pause")   # Pause for the spindle to get to speed
         write_gcode_line(file)
 
         last_spindle = config.spindle_start
@@ -152,17 +150,18 @@ def write_squares(outfile, x_sweep_str, y_sweep_str, squares):
 
             # If we're changing spindle speed, pause for 2sec before cutting
             if (spindle != last_spindle):
-                write_gcode_line(file, f"M3 S{spindle:{gcode.rpm_fmt}}")
-                write_gcode_line(file, "G4 P2", "2sec pause")
+                write_gcode_line(file, f"M3 S {spindle:{gcode.rpm_fmt}}")
+                write_gcode_line(file, "G4 P 2", "2sec pause")
                 last_spindle = spindle
 
-            write_gcode_line(file, f"G0 X{x: = {gcode.coord_fmt}} Y{y: = {gcode.coord_fmt}}")
+            write_gcode_line(file, f"G0 X {x:{gcode.coord_fmt}} Y {y:{gcode.coord_fmt}}")
             if first_square:
-                write_gcode_line(file, f"G0 Z{config.z_pass: = {gcode.coord_fmt}}")
+                write_gcode_line(file, f"G0 Z {config.z_pass:{gcode.coord_fmt}}")
                 first_square = False
 
-            write_gcode_line(file, f"G1 Z{z_cut: = {gcode.coord_fmt}} F{config.z_speed:{gcode.speed_fmt}}")
+            write_gcode_line(file, f"G1 Z {z_cut:{gcode.coord_fmt}} F {config.z_speed:{gcode.speed_fmt}}")
 
+            first_line = True
             if config.fill_square:
                 # Ensure at least one pass
                 num_passes = max(1, int(math.ceil(config.square_size / fill_step)))
@@ -171,23 +170,31 @@ def write_squares(outfile, x_sweep_str, y_sweep_str, squares):
                     y1 = min(y + config.square_size, y0 + fill_step)
                     if i % 2 == 0:
                         # Left to right
-                        write_gcode_line(file, f"G1 X{x: = {gcode.coord_fmt}} Y{y0: = {gcode.coord_fmt}} F{xy_speed:{gcode.speed_fmt}}")
-                        write_gcode_line(file, f"   X{x + config.square_size: = {gcode.coord_fmt}} Y{y0: = {gcode.coord_fmt}}")
+                        if first_line:
+                            write_gcode_line(file, f"G1 X {x:{gcode.coord_fmt}} Y {y0:{gcode.coord_fmt}} F {xy_speed:{gcode.speed_fmt}}")
+                            first_line = False
+                        else:
+                            write_gcode_line(file, f"   X {x:{gcode.coord_fmt}} Y {y0:{gcode.coord_fmt}}")
+                        write_gcode_line(file, f"   X {x + config.square_size:{gcode.coord_fmt}} Y {y0:{gcode.coord_fmt}}")
                     else:
                         # Right to left
-                        write_gcode_line(file, f"G1 X{x + config.square_size: = {gcode.coord_fmt}} Y{y0: = {gcode.coord_fmt}} F{xy_speed:{gcode.speed_fmt}}")
-                        write_gcode_line(file, f"   X{x: = {gcode.coord_fmt}} Y{y0: = {gcode.coord_fmt}}")
+                        if first_line:
+                            write_gcode_line(file, f"G1 X {x + config.square_size:{gcode.coord_fmt}} Y {y0:{gcode.coord_fmt}} F {xy_speed:{gcode.speed_fmt}}")
+                            first_line = False
+                        else:
+                            write_gcode_line(file, f"   X {x + config.square_size:{gcode.coord_fmt}} Y {y0:{gcode.coord_fmt}}")
+                        write_gcode_line(file, f"   X {x:{gcode.coord_fmt}} Y {y0:{gcode.coord_fmt}}")
             else:
-                write_gcode_line(file, f"G1 X{x + config.square_size: = {gcode.coord_fmt}} Y{y: = {gcode.coord_fmt}} F{xy_speed:{gcode.speed_fmt}}")
-                write_gcode_line(file, f"   Y{y + config.square_size: = {gcode.coord_fmt}}")
-                write_gcode_line(file, f"   X{x: = {gcode.coord_fmt}}")
-                write_gcode_line(file, f"   Y{y: = {gcode.coord_fmt}}")
+                write_gcode_line(file, f"G1 X {x + config.square_size:{gcode.coord_fmt}} Y {y:{gcode.coord_fmt}} F {xy_speed:{gcode.speed_fmt}}")
+                write_gcode_line(file, f"   Y {y + config.square_size:{gcode.coord_fmt}}")
+                write_gcode_line(file, f"   X {x:{gcode.coord_fmt}}")
+                write_gcode_line(file, f"   Y {y:{gcode.coord_fmt}}")
 
-            write_gcode_line(file, f"G0 Z{config.z_pass: = {gcode.coord_fmt}}")
+            write_gcode_line(file, f"G0 Z {config.z_pass:{gcode.coord_fmt}}")
             write_gcode_line(file)
 
-        write_gcode_line(file, f"G0 Z{config.z_idle: = {gcode.coord_fmt}}")
-        write_gcode_line(file, f"G0 X{config.x_idle: = {gcode.coord_fmt}} Y{config.y_idle: = {gcode.coord_fmt}}")
+        write_gcode_line(file, f"G0 Z {config.z_idle:{gcode.coord_fmt}}")
+        write_gcode_line(file, f"G0 X {config.x_idle:{gcode.coord_fmt}} Y {config.y_idle:{gcode.coord_fmt}}")
         write_gcode_line(file, "M5")
         write_gcode_line(file)
 
@@ -205,24 +212,22 @@ def generate_sweep_string(axis, mode, steps):
     return f"{f'Sweeping {param_name} over {axis} axis:':<30} [{values}]"
 
 # Generate an array of strings reporting the command-line arguments used
-def build_cmdline_str(argv, outfile):
+def build_cmdline_str(argv):
     """
     Build a list of strings representing the command-line call, each <= 80 chars,
-    not splitting arguments. Exclude outfile argument.
+    not splitting arguments.
     """
     cmdline_str = []
     current = ""
-    for arg in argv:
-        if arg == outfile:
-            continue
-        if current and len(current) + 1 + len(arg) > 80:
+    for i in range(1, len(argv)-1):
+        if current and len(current) + 1 + len(argv[i]) > 80:
             cmdline_str.append(current)
-            current = arg
+            current = argv[i]
         else:
             if current:
-                current += " " + arg
+                current += " " + argv[i]
             else:
-                current = arg
+                current = argv[i]
     if current:
         cmdline_str.append(current)
     return cmdline_str
@@ -244,7 +249,7 @@ if __name__ == "__main__":
         exit(1)
 
     # Create a printable string of the command-line call that ran this program
-    cmdline_str = build_cmdline_str(sys.argv[1:], args.outfile)
+    cmdline_str = build_cmdline_str(sys.argv)
 
     # Generate X and Y sweep description strings
     x_sweep_str = generate_sweep_string("X", config.x_mode, config.x_steps)
