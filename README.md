@@ -1,5 +1,28 @@
 # CNCTools
 
+## board_cutout.py v0.1
+This script generates G-code for cutting out a PCB from a TL file describing its extents.
+
+It processes an input TL (TopLayer) gcode file, identifies the overall geometry of the board and generates a gcode file to cutout the board. The input TL should have a solid edge (which will be where the copper is removed as part of the TopLayer run). This program follows that edge shape and allows for a margin between that edge and the cut. 
+## Usage
+    python board_cutout.py <infile> <outfile> [options]
+## Arguments
+    infile          TL file for board geometry reference.
+    outfile         Output G-code filename.
+## Options
+    --tl_tool_dia   TL file tool diameter (default: 0.015in, 30deg V-bit)
+    --safe_z        Safe Z height (default: 0.500in)
+    --pass_z        Passing Z height (default: 0.050in)
+    --tab_depth     Depth to start leaving tabs (default: -0.036in)
+    --tab_size      Size of tab holding board (default: 0.150in)
+    --spindle       Spindle speed in RPM (default: 10000)
+    --tool_dia      Tool diameter used to cut (default: 0.059in = 1.5mm endmill)
+    --margin        Margin of board to leave around edge (default: 0.000in)
+    --xy_speed      XY cutting speed (default: 4.0ipm)
+    --z_speed       Z cutting speed (default: 2.0ipm)
+    --z_cut         Cutting depth per pass (default: -0.006in)
+    --depth         Total depth of cutout (default: -0.066in)
+
 ## svg_cutout.py v0.3
 This script converts SVG paths into G-code filled rectangles for CNC machining.
 I originally wrote this to remove solder mask from the pads on a PCB using CNC machining.
